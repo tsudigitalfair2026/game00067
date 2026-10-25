@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>🐧ペンギン氷パズルDX</title>
+
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+-webkit-tap-highlight-color:transparent;
+}
+
+html,body{
+width:100%;
+height:100%;
+overflow:hidden;
+font-family:sans-serif;
+background:linear-gradient(#0d7fc0,#063a5d);
+touch-action:none;
+color:#fff;
+}
+
+.screen{
+display:none;
+width:100%;
+height:100%;
+padding:10px;
+}
+
+.active{
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+}
+
+h1,h2,p{
+text-align:center;
+}
+
+button{
+border:none;
+border-radius:18px;
+background:#ffd84d;
+color:#222;
+font-size:22px;
+font-weight:bold;
+padding:16px 28px;
+min-width:220px;
+cursor:pointer;
+}
+
+#gameScreen{
+padding:10px;
+}
+
+#topbar{
+width:100%;
+display:flex;
+justify-content:space-between;
+font-size:20px;
+font-weight:bold;
+margin-bottom:8px;
+}
+
+#goal{
+text-align:center;
+font-size:18px;
+margin-bottom:8px;
+}
+
+#combo{
+height:30px;
+font-size:22px;
+font-weight:bold;
+color:#ffe95a;
+text-align:center;
+margin-bottom:8px;
+}
+
+#board{
+width:min(92vw,420px);
+height:min(92vw,420px);
+display:grid;
+grid-template-columns:repeat(4,1fr);
+grid-template-rows:repeat(4,1fr);
+gap:6px;
+}
+
+.tile{
+display:flex;
+align-items:center;
+justify-content:center;
+border-radius:14px;
+font-size:24px;
+font-weight:bold;
+user-select:none;
+transition:.2s;
+}
+
+.fish{
+background:#a9edff;
+color:#003c57;
+}
+
+.correct{
+background:#8fff8f;
+box-shadow:0 0 12px #8fff8f;
+}
+
+.moveable{
+background:#ffe25f;
+box-shadow:
+0 0 10px #fff,
+0 0 20px #ffe25f;
+animation:pulse .8s infinite;
+cursor:pointer;
+}
+
+.penguin{
+background:#fff;
+font-size:42px;
+}
+
+@keyframes pulse{
+50%{
+transform:scale(1.08);
+}
+}
+
+.rainbow{
+animation:rainbow .4s linear infinite;
+}
+
+@keyframes rainbow{
+from{filter:hue-rotate(0deg);}
+to{filter:hue-rotate(360deg);}
+}
+
+#help{
+margin-top:10px;
+font-size:15px;
+text-align:center;
+line-height:1.5;
+}
+
+.warning{
+color:#ffeb3b;
+font-size:28px;
+}
+
+#rank{
+font-size:36px;
+}
+
+.small{
+font-size:14px;
+line-height:1.7;
+max-width:500px;
+text-align:center;
+}
+</style>
+</head>
+<body>
+
+<div id="startScreen" class="screen active">
+
+<h1>🐧 ペンギン氷パズルDX</h1>
+
+<br>
+
+<div class="small">
+【遊び方】<br><br>
+
+✨ 光っている魚だけ動かせます<br>
+✨ 光る魚をタップしてください<br>
+✨ 数字を順番に並べましょう<br>
+✨ 最後に🐧を右下へ！<br>
+✨ 100秒以内クリアで高得点！<br>
+✨ 連続成功で虹色コンボ発動！<br><br>
+
+完成形<br><br>
+
+1 2 3 4<br>
+5 6 7 8<br>
+9 10 11 12<br>
+13 14 15 🐧
+</div>
+
+<br>
+
+<button id="startBtn">スタート</button>
+
+</div>
+
+<div id="gameScreen" class="screen">
+
+<div id="topbar">
+<div>🏆 <span id="score">0</span></div>
+<div>⏰ <span id="time">100</span></div>
+</div>
+
+<div id="goal">
+次にそろえる数字：
+<b id="goalNum">1</b>
+</div>
+
+<div id="combo"></div>
+
+<div id="board"></div>
+
+<div id="help">
+👇 光る魚をタップして動かそう！
+</div>
+
+</div>
+
+<div id="resultScreen" class="screen">
+
+<h2>結果発表</h2>
+
+<br>
+
+<h1 id="finalScore">0</h1>
+
+<br>
+
+<h2 id="rank">C</h2>
+
+<br>
+
+<button id="retryBtn">もう一度遊ぶ</button>
+
+</div>
+
+<script>
+
+const startScreen=document.getElementById("startScreen");
+const gameScreen=document.getElementById("gameScreen");
+const resultScreen=document.getElementById("resultScreen");
+
+const boardEl=document.getElementById("board");
+const scoreEl=document.getElementById("score");
+const timeEl=document.getElementById("time");
+const goalNum=document.getElementById("goalNum");
+const comboEl=document.getElementById("combo");
+
+const finalScore=document.getElementById("finalScore");
+const rankText=document.getElementById("rank");
+
+let board=[];
+let score=0;
+let timeLeft=100;
+let timer=null;
+let combo=0;
+let cleared=false;
+let gameActive=false;
+
+function show(screen){
+[startScreen,gameScreen,resultScreen]
+.forEach(s=>s.classList.remove("active"));
+
+screen.classList.add("active");
+}
+
+function startGame(){
+
+clearInterval(timer);
+
+score=0;
+combo=0;
+timeLeft=100;
+cleared=false;
+gameActive=true;
+
+scoreEl.textContent="0";
+timeEl.textContent="30";
+timeEl.classList.remove("warning");
+comboEl.textContent="";
+
+createPuzzle();
+render();
+
+show(gameScreen);
+
+timer=setInterval(()=>{
+
+if(!gameActive)return;
+
+timeLeft--;
+
+timeEl.textContent=timeLeft;
+
+if(timeLeft<=5){
+timeEl.classList.add("warning");
+}
+
+if(timeLeft<=0){
+finish(false);
+}
+
+},1000);
+}
+
+function createPuzzle(){
+
+board=[
+1,2,3,4,
+5,6,7,8,
+9,10,11,12,
+13,14,15,0
+];
+
+for(let i=0;i<300;i++){
+
+const empty=board.indexOf(0);
+
+const moves=[];
+
+const r=Math.floor(empty/4);
+const c=empty%4;
+
+if(r>0)moves.push(empty-4);
+if(r<3)moves.push(empty+4);
+if(c>0)moves.push(empty-1);
+if(c<3)moves.push(empty+1);
+
+const target=moves[Math.floor(Math.random()*moves.length)];
+
+[board[empty],board[target]]=
+[board[target],board[empty]];
+}
+}
+
+function movableTiles(){
+
+const empty=board.indexOf(0);
+
+const arr=[];
+
+const r=Math.floor(empty/4);
+const c=empty%4;
+
+if(r>0)arr.push(empty-4);
+if(r<3)arr.push(empty+4);
+if(c>0)arr.push(empty-1);
+if(c<3)arr.push(empty+1);
+
+return arr;
+}
+
+function countCorrect(){
+
+let total=0;
+
+for(let i=0;i<15;i++){
+if(board[i]===i+1){
+total++;
+}
+}
+
+return total;
+}
+
+function updateGoal(){
+
+let next=1;
+
+for(let i=0;i<15;i++){
+
+if(board[i]===i+1){
+next=i+2;
+}else{
+next=i+1;
+break;
+}
+}
+
+goalNum.textContent=
+(next>15) ? "完成目前" : next;
+}
+
+function render(){
+
+boardEl.innerHTML="";
+
+const movable=movableTiles();
+
+board.forEach((value,index)=>{
+
+const tile=document.createElement("div");
+
+if(value===0){
+
+tile.className="tile penguin";
+tile.textContent="🐧";
+
+}else{
+
+tile.className="tile fish";
+
+if(value===index+1){
+tile.classList.add("correct");
+}
+
+if(movable.includes(index)){
+tile.classList.add("moveable");
+}
+
+if(combo>=3){
+tile.classList.add("rainbow");
+}
+
+tile.textContent=value;
+
+tile.addEventListener("click",()=>{
+
+if(!gameActive)return;
+
+if(!movable.includes(index))return;
+
+moveTile(index);
+});
+}
+
+boardEl.appendChild(tile);
+
+});
+
+updateGoal();
+}
+
+function moveTile(index){
+
+const empty=board.indexOf(0);
+
+const before=countCorrect();
+
+[board[index],board[empty]]=
+[board[empty],board[index]];
+
+const after=countCorrect();
+
+if(after>before){
+
+combo++;
+
+score+=30+(combo*10);
+
+if(combo>=2){
+comboEl.textContent=
+"🌈 "+combo+" コンボ！";
+}
+
+}else{
+
+combo=0;
+comboEl.textContent="";
+score+=10;
+}
+
+scoreEl.textContent=score;
+
+render();
+
+checkClear();
+}
+
+function checkClear(){
+
+for(let i=0;i<15;i++){
+
+if(board[i]!==i+1){
+return;
+}
+}
+
+if(board[15]!==0){
+return;
+}
+
+if(cleared)return;
+
+cleared=true;
+
+score+=1000+(timeLeft*100);
+
+scoreEl.textContent=score;
+
+finish(true);
+}
+
+function getRank(score){
+
+if(score>=1800)return "SSS";
+if(score>=1400)return "SS";
+if(score>=1000)return "S";
+if(score>=700)return "A";
+if(score>=400)return "B";
+return "C";
+}
+
+function finish(clear){
+
+gameActive=false;
+
+clearInterval(timer);
+
+finalScore.textContent=score;
+
+rankText.textContent=
+getRank(score)+(clear ? " 🎉クリア" : " ⏰時間切れ");
+
+show(resultScreen);
+}
+
+document.getElementById("startBtn")
+.addEventListener("click",startGame);
+
+document.getElementById("retryBtn")
+.addEventListener("click",startGame);
+
+document.addEventListener("gesturestart",e=>{
+e.preventDefault();
+});
+
+</script>
+
+</body>
+</html>
